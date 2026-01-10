@@ -88,7 +88,7 @@ def validate_content(file_path, misi_id, nama_peserta):
     Jawab HANYA dengan format JSON ini (tanpa markdown ```json):
     {
         "status": "VALID" atau "INVALID",
-        "alasan": "Berikan alasan singkat dan santai dalam 1 kalimat bahasa Indonesia untuk """ + nama_peserta + """."
+        "alasan": "Berikan alasan singkat dan santai dalam 1 kalimat bahasa Indonesia beserta 1 kalimat yang menjelaskan apa isi vidio dari link tersebut yang membuat vidio tersebut ditolak untuk """ + nama_peserta + """."
     }
     """
 
@@ -144,3 +144,4 @@ if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     print(f"🔥 Server AI Validator (Gemini 2.5) Siap di Port {port}!")
     app.run(host='0.0.0.0', port=port)
+
