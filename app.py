@@ -11,9 +11,6 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# =========================
-# 1. KONFIGURASI API 
-# =========================
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
@@ -23,15 +20,11 @@ else:
     print("✅ API Key berhasil dimuat.")
     genai.configure(api_key=GOOGLE_API_KEY)
 
-# =========================
-# 2. FUNGSI DOWNLOADER (OPTIMASI RAILWAY)
-# =========================
 def download_video(url):
     print(f"📥 Sedang mengunduh: {url}")
     
-    # Settingan Hemat RAM & Anti-Blokir
     ydl_opts = {
-        'format': 'best[height<=480]/best[height<=360]/worst', # Max 480p
+        'format': 'best[height<=480]/best[height<=360]/worst', 
         'outtmpl': 'temp_video.mp4',
         'quiet': True,
         'no_warnings': True,
@@ -52,22 +45,16 @@ def download_video(url):
         print(f"Error Download: {e}")
         return None
 
-# =========================
-# 3. FUNGSI AI VALIDATOR
-# =========================
 def validate_content(file_path, misi_id, nama_peserta):
-    # Gunakan model flash agar cepat
-    model = genai.GenerativeModel("models/gemini-1.5-flash") 
+    model = genai.GenerativeModel("gemini-2.5-flash") 
     
-    print("🤖 Mengunggah ke AI...")
+    print("🤖 Mengunggah ke AI (Gemini 2.5)...")
     video_file = genai.upload_file(path=file_path)
 
-    # Tunggu processing
     while video_file.state.name == "PROCESSING":
         time.sleep(1)
         video_file = genai.get_file(video_file.name)
 
-    # Logic Prompt
     prompt_spesifik = ""
     try:
         misi_id = int(misi_id)
@@ -102,22 +89,17 @@ def validate_content(file_path, misi_id, nama_peserta):
         "status": "VALID" atau "INVALID",
         "alasan": "Berikan alasan singkat dan santai dalam 1 kalimat bahasa Indonesia untuk {nama_peserta}."
     }}
-    """
 
     response = model.generate_content([video_file, final_prompt])
     
-    # Hapus file di Cloud Google
     try: genai.delete_file(video_file.name)
     except: pass
     
     return response.text
 
-# =========================
-# 4. ENDPOINT UTAMA
-# =========================
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Server AI Validator is Running!", 200
+    return "Server AI Validator (Gemini 2.5) is Running!", 200
 
 @app.route('/cek-video', methods=['POST'])
 def api_handler():
@@ -129,23 +111,20 @@ def api_handler():
     if not link:
         return jsonify({"status": "INVALID", "alasan": "Link video kosong."})
 
-    # 1. Download
     path = download_video(link)
     if not path:
         return jsonify({"status": "INVALID", "alasan": "Gagal download video. Pastikan link TikTok/IG publik dan benar."})
 
-    # 2. Analisis AI
     try:
         hasil_teks = validate_content(path, misi_id, nama)
         
-        # Bersihkan text JSON
         clean_text = hasil_teks.replace("```json", "").replace("```", "").strip()
         hasil_json = json.loads(clean_text)
         
     except Exception as e:
-        hasil_json = {"status": "INVALID", "alasan": f"AI Error: {str(e)}"}
+        print(f"AI Error Detail: {e}") 
+        hasil_json = {"status": "INVALID", "alasan": "AI sedang sibuk atau video terlalu sulit dianalisa."}
 
-    # 3. Cleanup File Lokal
     try:
         if os.path.exists(path):
             os.remove(path)
@@ -154,16 +133,12 @@ def api_handler():
 
     return jsonify(hasil_json)
 
-# =========================
-# 5. START SERVER
-# =========================
 if __name__ == '__main__':
-    # Auto update yt-dlp saat start
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
     except:
         pass
 
     port = int(os.environ.get("PORT", 5000))
-    print(f"🔥 Server AI Validator Siap di Port {port}!")
+    print(f"🔥 Server AI Validator (Gemini 2.5) Siap di Port {port}!")
     app.run(host='0.0.0.0', port=port)
