@@ -2,3 +2,6 @@ flask
 flask-cors
 yt-dlp
 google-generativeai
+imagehash
+Pillow
+opencv-python-headless
