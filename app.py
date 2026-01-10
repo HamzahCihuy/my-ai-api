@@ -74,21 +74,23 @@ def validate_content(file_path, misi_id, nama_peserta):
     else:
         prompt_spesifik = "Video harus menampilkan suasana wisata alam outdoor."
 
-    final_prompt = f"""
+    # PERBAIKAN DI SINI: Menggunakan string biasa agar kurung kurawal JSON tidak error
+    final_prompt = """
     Kamu adalah Validator Lomba Wisata 'Bukit Jar'un'.
-    Nama Peserta: {nama_peserta}
+    Nama Peserta: """ + nama_peserta + """
     
-    Tugas: Cek apakah video ini valid untuk misi: "{prompt_spesifik}"
+    Tugas: Cek apakah video ini valid untuk misi: " """ + prompt_spesifik + """ "
     
     Aturan:
     1. Jika video menampilkan apa yang diminta di misi -> status: VALID.
     2. Jika video gelap, tidak jelas, atau tidak nyambung -> status: INVALID.
     
     Jawab HANYA dengan format JSON ini (tanpa markdown ```json):
-    {{
+    {
         "status": "VALID" atau "INVALID",
-        "alasan": "Berikan alasan singkat dan santai dalam 1 kalimat bahasa Indonesia untuk {nama_peserta}."
-    }}
+        "alasan": "Berikan alasan singkat dan santai dalam 1 kalimat bahasa Indonesia untuk """ + nama_peserta + """."
+    }
+    """
 
     response = model.generate_content([video_file, final_prompt])
     
