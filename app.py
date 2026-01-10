@@ -4,6 +4,9 @@ import json
 import subprocess
 import sys
 import yt_dlp
+import cv2
+import imagehash
+from PIL import Image
 import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -14,17 +17,46 @@ CORS(app)
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
-    print("❌ PERINGATAN: API Key belum disetting di Railway Variables!")
+    print("❌ PERINGATAN: API Key belum disetting!")
     genai.configure(api_key="")
 else:
     print("✅ API Key berhasil dimuat.")
     genai.configure(api_key=GOOGLE_API_KEY)
 
+# --- FUNGSI BARU: MEMBUAT SIDIK JARI VIDEO ---
+def get_video_fingerprint(video_path):
+    try:
+        # Buka video menggunakan OpenCV
+        cap = cv2.VideoCapture(video_path)
+        # Ambil frame di detik ke-1 (supaya bukan layar hitam awal)
+        cap.set(cv2.CAP_PROP_POS_MSEC, 1000) 
+        success, frame = cap.read()
+        
+        if not success:
+            # Kalau video pendek, ambil frame awal
+            cap.set(cv2.CAP_PROP_POS_MSEC, 0)
+            success, frame = cap.read()
+
+        cap.release()
+
+        if success:
+            # Konversi ke format gambar PIL
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            im_pil = Image.fromarray(img)
+            # Buat Hash (Sidik Jari)
+            # pHash sangat bagus mengenali gambar yang sama meski sedikit berubah
+            hash_code = str(imagehash.phash(im_pil))
+            return hash_code
+        return None
+    except Exception as e:
+        print(f"Gagal membuat fingerprint: {e}")
+        return None
+
 def download_video(url):
     print(f"📥 Sedang mengunduh: {url}")
-    
+    # Opsi download tanpa audio (lebih cepat, karena kita cuma butuh visual)
     ydl_opts = {
-        'format': 'best[height<=480]/best[height<=360]/worst', 
+        'format': 'best[height<=480]', 
         'outtmpl': 'temp_video.mp4',
         'quiet': True,
         'no_warnings': True,
@@ -48,7 +80,7 @@ def download_video(url):
 def validate_content(file_path, misi_id, nama_peserta):
     model = genai.GenerativeModel("gemini-2.5-flash") 
     
-    print("🤖 Mengunggah ke AI (Gemini 2.5)...")
+    print("🤖 Mengunggah ke AI...")
     video_file = genai.upload_file(path=file_path)
 
     while video_file.state.name == "PROCESSING":
@@ -74,34 +106,28 @@ def validate_content(file_path, misi_id, nama_peserta):
     else:
         prompt_spesifik = "Video harus menampilkan suasana wisata alam outdoor."
 
-    # PERBAIKAN DI SINI: Menggunakan string biasa agar kurung kurawal JSON tidak error
     final_prompt = """
     Kamu adalah Validator Lomba Wisata 'Bukit Jar'un'.
     Nama Peserta: """ + nama_peserta + """
-    
     Tugas: Cek apakah video ini valid untuk misi: " """ + prompt_spesifik + """ "
-    
     Aturan:
     1. Jika video menampilkan apa yang diminta di misi -> status: VALID.
     2. Jika video gelap, tidak jelas, atau tidak nyambung -> status: INVALID.
-    
-    Jawab HANYA dengan format JSON ini (tanpa markdown ```json):
+    Jawab HANYA dengan format JSON ini:
     {
         "status": "VALID" atau "INVALID",
-        "alasan": "Berikan alasan singkat dan santai dalam 1 kalimat bahasa Indonesia beserta 1 kalimat yang menjelaskan apa isi vidio dari link tersebut yang membuat vidio tersebut ditolak untuk """ + nama_peserta + """."
+        "alasan": "Alasan singkat untuk """ + nama_peserta + """."
     }
     """
 
     response = model.generate_content([video_file, final_prompt])
-    
     try: genai.delete_file(video_file.name)
     except: pass
-    
     return response.text
 
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Server AI Validator (Gemini 2.5) is Running!", 200
+    return "Server AI Anti-Cheat Ready!", 200
 
 @app.route('/cek-video', methods=['POST'])
 def api_handler():
@@ -115,33 +141,32 @@ def api_handler():
 
     path = download_video(link)
     if not path:
-        return jsonify({"status": "INVALID", "alasan": "Gagal download video. Pastikan link TikTok/IG publik dan benar."})
+        return jsonify({"status": "INVALID", "alasan": "Gagal download video."})
 
+    # 1. BUAT SIDIK JARI VIDEO (HASH)
+    fingerprint = get_video_fingerprint(path)
+    
+    # 2. ANALISIS AI
     try:
         hasil_teks = validate_content(path, misi_id, nama)
-        
         clean_text = hasil_teks.replace("```json", "").replace("```", "").strip()
         hasil_json = json.loads(clean_text)
         
+        # Masukkan fingerprint ke respon JSON agar bisa dicek PHP
+        hasil_json['video_hash'] = fingerprint 
+        
     except Exception as e:
-        print(f"AI Error Detail: {e}") 
-        hasil_json = {"status": "INVALID", "alasan": "AI sedang sibuk atau video terlalu sulit dianalisa."}
+        print(f"AI Error: {e}") 
+        hasil_json = {"status": "INVALID", "alasan": "AI error."}
 
     try:
-        if os.path.exists(path):
-            os.remove(path)
-    except Exception as e:
-        print(f"⚠️ Gagal hapus file: {e}")
+        if os.path.exists(path): os.remove(path)
+    except: pass
 
     return jsonify(hasil_json)
 
 if __name__ == '__main__':
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
-    except:
-        pass
-
+    try: subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
+    except: pass
     port = int(os.environ.get("PORT", 5000))
-    print(f"🔥 Server AI Validator (Gemini 2.5) Siap di Port {port}!")
     app.run(host='0.0.0.0', port=port)
-
