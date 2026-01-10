@@ -12,48 +12,16 @@ app = Flask(__name__)
 CORS(app)
 
 # =========================
-# 1. KONFIGURASI API (UPDATE UTAMA)
+# 1. KONFIGURASI API 
 # =========================
-# Mengambil kunci dari "Brankas" Railway (Environment Variables)
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
     print("❌ PERINGATAN: API Key belum disetting di Railway Variables!")
-    # Fallback kosong agar tidak error saat start, tapi nanti akan error saat dipakai
     genai.configure(api_key="")
 else:
-    print("✅ API Key berhasil dimuat dari Railway.")
+    print("✅ API Key berhasil dimuat.")
     genai.configure(api_key=GOOGLE_API_KEY)
-if GOOGLE_API_KEY:
-    # Tampilkan 5 huruf awal dan 5 huruf akhir key di Log Railway
-    # Ini aman karena tidak menampilkan seluruh key
-    print(f"🔑 Key Aktif: {GOOGLE_API_KEY[:5]}...{GOOGLE_API_KEY[-5:]}")
-else:
-    print("❌ Key KOSONG/TIDAK TERBACA")
-
-# ==========================================
-# FITUR: AUTO UPDATE YT-DLP
-# ==========================================
-def update_library():
-    """Fungsi untuk memaksa update yt-dlp via pip"""
-    print("🔄 Memulai Update yt-dlp...")
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
-        print("✅ yt-dlp berhasil diupdate ke versi terbaru!")
-        return True
-    except Exception as e:
-        print(f"❌ Gagal update: {e}")
-        return False
-
-@app.route('/update-system', methods=['GET'])
-def trigger_update():
-    """Endpoint rahasia untuk memicu update tanpa restart server"""
-    sukses = update_library()
-    if sukses:
-        return jsonify({"status": "success", "pesan": "Library yt-dlp berhasil diperbarui."})
-    else:
-        return jsonify({"status": "error", "pesan": "Gagal melakukan update."}), 500
-
 
 # =========================
 # 2. FUNGSI DOWNLOADER (OPTIMASI RAILWAY)
@@ -74,7 +42,6 @@ def download_video(url):
     }
     
     try:
-        # Hapus file lama jika ada
         if os.path.exists('temp_video.mp4'):
             os.remove('temp_video.mp4')
             
@@ -85,12 +52,12 @@ def download_video(url):
         print(f"Error Download: {e}")
         return None
 
-
 # =========================
 # 3. FUNGSI AI VALIDATOR
 # =========================
-def validate_content(file_path, misi_id):
-    model = genai.GenerativeModel("models/gemini-2.5-flash") # atau 1.5-flash
+def validate_content(file_path, misi_id, nama_peserta):
+    # Gunakan model flash agar cepat
+    model = genai.GenerativeModel("models/gemini-1.5-flash") 
     
     print("🤖 Mengunggah ke AI...")
     video_file = genai.upload_file(path=file_path)
@@ -121,13 +88,19 @@ def validate_content(file_path, misi_id):
         prompt_spesifik = "Video harus menampilkan suasana wisata alam outdoor."
 
     final_prompt = f"""
-    Kamu adalah Validator Lomba.
-    Tugas: Cek apakah video ini memenuhi syarat misi: "{prompt_spesifik}"
+    Kamu adalah Validator Lomba Wisata 'Bukit Jar'un'.
+    Nama Peserta: {nama_peserta}
     
-    Jawab HANYA dengan format JSON ini (tanpa markdown):
+    Tugas: Cek apakah video ini valid untuk misi: "{prompt_spesifik}"
+    
+    Aturan:
+    1. Jika video menampilkan apa yang diminta di misi -> status: VALID.
+    2. Jika video gelap, tidak jelas, atau tidak nyambung -> status: INVALID.
+    
+    Jawab HANYA dengan format JSON ini (tanpa markdown ```json):
     {{
         "status": "VALID" atau "INVALID",
-        "alasan": "Alasan singkat 1 kalimat"
+        "alasan": "Berikan alasan singkat dan santai dalam 1 kalimat bahasa Indonesia untuk {nama_peserta}."
     }}
     """
 
@@ -138,7 +111,6 @@ def validate_content(file_path, misi_id):
     except: pass
     
     return response.text
-
 
 # =========================
 # 4. ENDPOINT UTAMA
@@ -152,44 +124,46 @@ def api_handler():
     data = request.json
     link = data.get('url')
     misi_id = data.get('misi_id') 
+    nama = data.get('nama', 'Peserta')
 
     if not link:
-        return jsonify({"status": "error", "alasan": "Link kosong"})
+        return jsonify({"status": "INVALID", "alasan": "Link video kosong."})
 
     # 1. Download
     path = download_video(link)
     if not path:
-        return jsonify({"status": "error", "alasan": "Gagal download video (Link private/salah)"})
+        return jsonify({"status": "INVALID", "alasan": "Gagal download video. Pastikan link TikTok/IG publik dan benar."})
 
     # 2. Analisis AI
     try:
-        hasil_teks = validate_content(path, misi_id)
+        hasil_teks = validate_content(path, misi_id, nama)
         
         # Bersihkan text JSON
         clean_text = hasil_teks.replace("```json", "").replace("```", "").strip()
         hasil_json = json.loads(clean_text)
         
     except Exception as e:
-        hasil_json = {"status": "error", "alasan": f"AI Error: {str(e)}"}
+        hasil_json = {"status": "INVALID", "alasan": f"AI Error: {str(e)}"}
 
     # 3. Cleanup File Lokal
     try:
         if os.path.exists(path):
             os.remove(path)
-            print(f"🗑️ File {path} berhasil dihapus.")
     except Exception as e:
         print(f"⚠️ Gagal hapus file: {e}")
 
     return jsonify(hasil_json)
 
-
 # =========================
 # 5. START SERVER
 # =========================
 if __name__ == '__main__':
-    # Ambil PORT dari Railway, default 5000
+    # Auto update yt-dlp saat start
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
+    except:
+        pass
+
     port = int(os.environ.get("PORT", 5000))
     print(f"🔥 Server AI Validator Siap di Port {port}!")
-    
-    # Host 0.0.0.0 Wajib untuk Railway
     app.run(host='0.0.0.0', port=port)
