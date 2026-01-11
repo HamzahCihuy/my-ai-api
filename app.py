@@ -23,28 +23,22 @@ else:
     print("✅ API Key berhasil dimuat.")
     genai.configure(api_key=GOOGLE_API_KEY)
 
-# --- FUNGSI BARU: MEMBUAT SIDIK JARI VIDEO ---
+# --- FUNGSI SIDIK JARI VIDEO (ANTI RE-UPLOAD) ---
 def get_video_fingerprint(video_path):
     try:
-        # Buka video menggunakan OpenCV
         cap = cv2.VideoCapture(video_path)
-        # Ambil frame di detik ke-1 (supaya bukan layar hitam awal)
         cap.set(cv2.CAP_PROP_POS_MSEC, 1000) 
         success, frame = cap.read()
         
         if not success:
-            # Kalau video pendek, ambil frame awal
             cap.set(cv2.CAP_PROP_POS_MSEC, 0)
             success, frame = cap.read()
 
         cap.release()
 
         if success:
-            # Konversi ke format gambar PIL
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             im_pil = Image.fromarray(img)
-            # Buat Hash (Sidik Jari)
-            # pHash sangat bagus mengenali gambar yang sama meski sedikit berubah
             hash_code = str(imagehash.phash(im_pil))
             return hash_code
         return None
@@ -52,18 +46,22 @@ def get_video_fingerprint(video_path):
         print(f"Gagal membuat fingerprint: {e}")
         return None
 
+# --- BAGIAN INI YANG SAYA PERBAIKI (KEMBALI KE VERSI LANCAR) ---
 def download_video(url):
     print(f"📥 Sedang mengunduh: {url}")
-    # Opsi download tanpa audio (lebih cepat, karena kita cuma butuh visual)
+    
     ydl_opts = {
-        'format': 'best[height<=480]', 
+        # SAYA KEMBALIKAN SUPAYA BISA SEMUA FORMAT (Best)
+        # Artinya: Cari yg kecil dulu, kalau gak ada, ambil APAPUN yg ada.
+        'format': 'best[height<=480]/best[height<=720]/best', 
         'outtmpl': 'temp_video.mp4',
         'quiet': True,
         'no_warnings': True,
         'overwrites': True,
         'nocheckcertificate': True,
         'geo_bypass': True,
-        'user_agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
+        # User Agent agar tidak diblokir TikTok
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     }
     
     try:
@@ -141,18 +139,16 @@ def api_handler():
 
     path = download_video(link)
     if not path:
-        return jsonify({"status": "INVALID", "alasan": "Gagal download video."})
+        return jsonify({"status": "INVALID", "alasan": "Gagal download video (Cek Link/Privasi)."})
 
-    # 1. BUAT SIDIK JARI VIDEO (HASH)
     fingerprint = get_video_fingerprint(path)
     
-    # 2. ANALISIS AI
     try:
         hasil_teks = validate_content(path, misi_id, nama)
         clean_text = hasil_teks.replace("```json", "").replace("```", "").strip()
         hasil_json = json.loads(clean_text)
         
-        # Masukkan fingerprint ke respon JSON agar bisa dicek PHP
+        # Kirim fingerprint ke PHP
         hasil_json['video_hash'] = fingerprint 
         
     except Exception as e:
