@@ -17,10 +17,10 @@ CORS(app)
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
-    print("API Key belum disetting!")
+    print("❌ PERINGATAN: API Key belum disetting!")
     genai.configure(api_key="")
 else:
-    print("API Key berhasil dimuat.")
+    print("✅ API Key berhasil dimuat.")
     genai.configure(api_key=GOOGLE_API_KEY)
 
 def get_video_fingerprint(video_path):
@@ -41,16 +41,30 @@ def get_video_fingerprint(video_path):
         print(f"Gagal fingerprint: {e}")
         return None
 
+# --- BAGIAN INI SUDAH DISAMAKAN PERSIS DENGAN KODE KAMU ---
 def download_video(url):
-    print(f"Sedang mengunduh: {url}")
+    print(f"📥 Sedang mengunduh: {url}")
+    
     ydl_opts = {
+        # Format sesuai kodemu
         'format': 'best[height<=480]/best[height<=720]/best',
-        'outtmpl': 'temp_video_%(id)s.mp4',
-        'quiet': True, 'no_warnings': True, 'overwrites': True,
-        'nocheckcertificate': True, 'geo_bypass': True,
-        # SAYA HAPUS USER_AGENT AGAR YT-DLP MENGATUR SENDIRI (AUTO)
+        
+        # Nama file dibuat dinamis (pakai ID) agar support 3 video sekaligus
+        'outtmpl': 'temp_video_%(id)s.mp4', 
+        
+        # Settingan persis kodemu
+        'quiet': True,
+        'no_warnings': True,
+        'overwrites': True,
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        
+        # User Agent SAKTI dari kodemu (Chrome 91)
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     }
+    
     try:
+        # Kita gunakan metode extract_info agar bisa dapat nama file yang unik untuk setiap link
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             return ydl.prepare_filename(info)
@@ -59,9 +73,10 @@ def download_video(url):
         return None
 
 def validate_content(file_path, instruksi_input, nama_peserta):
+    # Menggunakan Gemini 2.5 Flash sesuai perintah
     model = genai.GenerativeModel("gemini-2.5-flash")
 
-    print("Mengunggah ke AI...")
+    print("🤖 Mengunggah ke AI...")
     video_file = genai.upload_file(path=file_path)
 
     while video_file.state.name == "PROCESSING":
@@ -70,10 +85,10 @@ def validate_content(file_path, instruksi_input, nama_peserta):
 
     prompt_spesifik = ""
 
+    # Logika CMS Prompt
     if isinstance(instruksi_input, str) and len(instruksi_input) > 3:
         prompt_spesifik = instruksi_input
-        print(f"Menggunakan Prompt CMS: {prompt_spesifik}")
-
+        print(f"✅ Menggunakan Prompt CMS: {prompt_spesifik}")
     else:
         try: misi_id = int(instruksi_input)
         except: misi_id = -1
@@ -85,6 +100,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
         elif misi_id == 4: prompt_spesifik = "Video harus menampilkan tenda camping."
         else: prompt_spesifik = "Video harus menampilkan wisata alam."
 
+    # Prompt Aman (JSON)
     final_prompt = f'''
     Kamu adalah Validator Lomba Wisata 'Bukit Jar'un'.
     Nama Peserta: {nama_peserta}
@@ -105,7 +121,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
 
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Server AI Ready (TikTok Fix v2)!", 200
+    return "Server AI Ready (Config by User)!", 200
 
 @app.route('/cek-video', methods=['POST'])
 def api_handler():
@@ -120,21 +136,18 @@ def api_handler():
         return jsonify({"status": "INVALID", "alasan": "Link video tidak ditemukan."})
 
     prompt_cms = data.get('prompt_ai')
-
     instruksi_dasar = prompt_cms if prompt_cms else data.get('misi_id', -1)
-
     nama = data.get('nama', 'Peserta')
     hashes = []
 
-    print(f"Memproses {len(urls)} video untuk {nama}...")
+    print(f"🔄 Memproses {len(urls)} video untuk {nama}...")
 
     for i, link in enumerate(urls):
         if not link: continue
 
         path = download_video(link)
         if not path:
-             # Menambahkan pesan error lebih detail agar user tahu server sedang update atau gagal
-             return jsonify({"status": "INVALID", "alasan": f"Gagal download video ke-{i+1}. Server sedang menyesuaikan algoritma TikTok baru. Coba lagi nanti."})
+             return jsonify({"status": "INVALID", "alasan": f"Gagal download video ke-{i+1}. Pastikan link benar."})
 
         fp = get_video_fingerprint(path)
         if fp: hashes.append(fp)
@@ -169,5 +182,7 @@ def api_handler():
     })
 
 if __name__ == '__main__':
+    try: subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
+    except: pass
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
