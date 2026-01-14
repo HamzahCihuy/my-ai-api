@@ -48,7 +48,7 @@ def download_video(url):
         'outtmpl': 'temp_video_%(id)s.mp4',
         'quiet': True, 'no_warnings': True, 'overwrites': True,
         'nocheckcertificate': True, 'geo_bypass': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        # SAYA HAPUS USER_AGENT AGAR YT-DLP MENGATUR SENDIRI (AUTO)
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -105,7 +105,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
 
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Server AI Ready (TikTok Fix via Requirements.txt)!", 200
+    return "Server AI Ready (TikTok Fix v2)!", 200
 
 @app.route('/cek-video', methods=['POST'])
 def api_handler():
@@ -133,7 +133,8 @@ def api_handler():
 
         path = download_video(link)
         if not path:
-             return jsonify({"status": "INVALID", "alasan": f"Gagal download video ke-{i+1}. Pastikan link publik & server yt-dlp terupdate."})
+             # Menambahkan pesan error lebih detail agar user tahu server sedang update atau gagal
+             return jsonify({"status": "INVALID", "alasan": f"Gagal download video ke-{i+1}. Server sedang menyesuaikan algoritma TikTok baru. Coba lagi nanti."})
 
         fp = get_video_fingerprint(path)
         if fp: hashes.append(fp)
