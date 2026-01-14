@@ -59,6 +59,7 @@ def download_video(url):
         return None
 
 def validate_content(file_path, instruksi_input, nama_peserta):
+    # KEMBALI KE GEMINI 2.5 FLASH SESUAI PERMINTAAN
     model = genai.GenerativeModel("gemini-2.5-flash")
 
     print("🤖 Mengunggah ke AI...")
@@ -85,18 +86,18 @@ def validate_content(file_path, instruksi_input, nama_peserta):
         elif misi_id == 4: prompt_spesifik = "Video harus menampilkan tenda camping."
         else: prompt_spesifik = "Video harus menampilkan wisata alam."
 
-    final_prompt = f"""
+    final_prompt = f'''
     Kamu adalah Validator Lomba Wisata 'Bukit Jar'un'.
     Nama Peserta: {nama_peserta}
     Tugas: Cek apakah video ini valid untuk kriteria: "{prompt_spesifik}"
-    """
+    
     Aturan:
     1. Jika visual video sesuai kriteria -> status: VALID.
     2. Jika video gelap, buram, atau tidak nyambung -> status: INVALID.
+    
     Jawab HANYA JSON:
     {{ "status": "VALID" atau "INVALID", "alasan": "Alasan singkat..." }}
-    """
-
+    '''
     response = model.generate_content([video_file, final_prompt])
     try: genai.delete_file(video_file.name)
     except: pass
