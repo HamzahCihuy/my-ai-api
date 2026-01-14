@@ -23,61 +23,44 @@ else:
     print("✅ API Key berhasil dimuat.")
     genai.configure(api_key=GOOGLE_API_KEY)
 
-# --- FUNGSI SIDIK JARI VIDEO (ANTI RE-UPLOAD) ---
 def get_video_fingerprint(video_path):
     try:
         cap = cv2.VideoCapture(video_path)
-        cap.set(cv2.CAP_PROP_POS_MSEC, 1000) 
+        cap.set(cv2.CAP_PROP_POS_MSEC, 1000)
         success, frame = cap.read()
-        
         if not success:
             cap.set(cv2.CAP_PROP_POS_MSEC, 0)
             success, frame = cap.read()
-
         cap.release()
-
         if success:
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             im_pil = Image.fromarray(img)
-            hash_code = str(imagehash.phash(im_pil))
-            return hash_code
+            return str(imagehash.phash(im_pil))
         return None
     except Exception as e:
-        print(f"Gagal membuat fingerprint: {e}")
+        print(f"Gagal fingerprint: {e}")
         return None
 
-# --- BAGIAN INI YANG SAYA PERBAIKI (KEMBALI KE VERSI LANCAR) ---
 def download_video(url):
     print(f"📥 Sedang mengunduh: {url}")
-    
     ydl_opts = {
-        # SAYA KEMBALIKAN SUPAYA BISA SEMUA FORMAT (Best)
-        # Artinya: Cari yg kecil dulu, kalau gak ada, ambil APAPUN yg ada.
-        'format': 'best[height<=480]/best[height<=720]/best', 
-        'outtmpl': 'temp_video.mp4',
-        'quiet': True,
-        'no_warnings': True,
-        'overwrites': True,
-        'nocheckcertificate': True,
-        'geo_bypass': True,
-        # User Agent agar tidak diblokir TikTok
+        'format': 'best[height<=480]/best[height<=720]/best',
+        'outtmpl': 'temp_video_%(id)s.mp4',
+        'quiet': True, 'no_warnings': True, 'overwrites': True,
+        'nocheckcertificate': True, 'geo_bypass': True,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     }
-    
     try:
-        if os.path.exists('temp_video.mp4'):
-            os.remove('temp_video.mp4')
-            
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        return "temp_video.mp4"
+            info = ydl.extract_info(url, download=True)
+            return ydl.prepare_filename(info)
     except Exception as e:
         print(f"Error Download: {e}")
         return None
 
-def validate_content(file_path, misi_id, nama_peserta):
-    model = genai.GenerativeModel("gemini-2.5-flash") 
-    
+def validate_content(file_path, instruksi_input, nama_peserta):
+    model = genai.GenerativeModel("gemini-2.5-flash")
+
     print("🤖 Mengunggah ke AI...")
     video_file = genai.upload_file(path=file_path)
 
@@ -86,36 +69,32 @@ def validate_content(file_path, misi_id, nama_peserta):
         video_file = genai.get_file(video_file.name)
 
     prompt_spesifik = ""
-    try:
-        misi_id = int(misi_id)
-    except:
-        misi_id = -1
 
-    if misi_id == 0: 
-        prompt_spesifik = "Video harus menampilkan buah kelapa muda, es kelapa, atau orang minum air kelapa."
-    elif misi_id == 1: 
-        prompt_spesifik = "Video harus menampilkan alat pancing, danau/kolam pemancingan, atau aktivitas memancing."
-    elif misi_id == 2: 
-        prompt_spesifik = "Video harus menampilkan hidangan ikan bakar atau proses membakar ikan."
-    elif misi_id == 3: 
-        prompt_spesifik = "Video harus menampilkan orang menaiki rakit/perahu bambu di atas air."
-    elif misi_id == 4: 
-        prompt_spesifik = "Video harus menampilkan tenda camping atau suasana berkemah."
+    if isinstance(instruksi_input, str) and len(instruksi_input) > 3:
+        prompt_spesifik = instruksi_input
+        print(f"✅ Menggunakan Prompt CMS: {prompt_spesifik}")
+
     else:
-        prompt_spesifik = "Video harus menampilkan suasana wisata alam outdoor."
+        try: misi_id = int(instruksi_input)
+        except: misi_id = -1
 
-    final_prompt = """
+        if misi_id == 0: prompt_spesifik = "Video harus menampilkan buah kelapa muda/es kelapa."
+        elif misi_id == 1: prompt_spesifik = "Video harus menampilkan alat pancing/danau."
+        elif misi_id == 2: prompt_spesifik = "Video harus menampilkan ikan bakar."
+        elif misi_id == 3: prompt_spesifik = "Video harus menampilkan rakit bambu."
+        elif misi_id == 4: prompt_spesifik = "Video harus menampilkan tenda camping."
+        else: prompt_spesifik = "Video harus menampilkan wisata alam."
+
+    final_prompt = f"""
     Kamu adalah Validator Lomba Wisata 'Bukit Jar'un'.
-    Nama Peserta: """ + nama_peserta + """
-    Tugas: Cek apakah video ini valid untuk misi: " """ + prompt_spesifik + """ "
+    Nama Peserta: {nama_peserta}
+    Tugas: Cek apakah video ini valid untuk kriteria: "{prompt_spesifik}"
+    """
     Aturan:
-    1. Jika video menampilkan apa yang diminta di misi -> status: VALID.
-    2. Jika video gelap, tidak jelas, atau tidak nyambung -> status: INVALID.
-    Jawab HANYA dengan format JSON ini:
-    {
-        "status": "VALID" atau "INVALID",
-        "alasan": "Alasan singkat untuk """ + nama_peserta + """."
-    }
+    1. Jika visual video sesuai kriteria -> status: VALID.
+    2. Jika video gelap, buram, atau tidak nyambung -> status: INVALID.
+    Jawab HANYA JSON:
+    {{ "status": "VALID" atau "INVALID", "alasan": "Alasan singkat..." }}
     """
 
     response = model.generate_content([video_file, final_prompt])
@@ -125,41 +104,67 @@ def validate_content(file_path, misi_id, nama_peserta):
 
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Server AI Anti-Cheat Ready!", 200
+    return "Server AI Ready (CMS + Multi-Link Mode)!", 200
 
 @app.route('/cek-video', methods=['POST'])
 def api_handler():
     data = request.json
-    link = data.get('url')
-    misi_id = data.get('misi_id') 
+
+    urls = data.get('urls')
+    if not urls:
+        single = data.get('url')
+        urls = [single] if single else []
+
+    if not urls:
+        return jsonify({"status": "INVALID", "alasan": "Link video tidak ditemukan."})
+
+    prompt_cms = data.get('prompt_ai')
+
+    instruksi_dasar = prompt_cms if prompt_cms else data.get('misi_id', -1)
+
     nama = data.get('nama', 'Peserta')
+    hashes = []
 
-    if not link:
-        return jsonify({"status": "INVALID", "alasan": "Link video kosong."})
+    print(f"🔄 Memproses {len(urls)} video untuk {nama}...")
 
-    path = download_video(link)
-    if not path:
-        return jsonify({"status": "INVALID", "alasan": "Gagal download video (Cek Link/Privasi)."})
+    for i, link in enumerate(urls):
+        if not link: continue
 
-    fingerprint = get_video_fingerprint(path)
-    
-    try:
-        hasil_teks = validate_content(path, misi_id, nama)
-        clean_text = hasil_teks.replace("```json", "").replace("```", "").strip()
-        hasil_json = json.loads(clean_text)
-        
-        # Kirim fingerprint ke PHP
-        hasil_json['video_hash'] = fingerprint 
-        
-    except Exception as e:
-        print(f"AI Error: {e}") 
-        hasil_json = {"status": "INVALID", "alasan": "AI error."}
+        path = download_video(link)
+        if not path:
+             return jsonify({"status": "INVALID", "alasan": f"Gagal download video ke-{i+1}."})
 
-    try:
-        if os.path.exists(path): os.remove(path)
-    except: pass
+        fp = get_video_fingerprint(path)
+        if fp: hashes.append(fp)
 
-    return jsonify(hasil_json)
+        try:
+            instruksi_final = instruksi_dasar
+            if len(urls) > 1 and isinstance(instruksi_dasar, str):
+                instruksi_final = f"{instruksi_dasar} (Ini adalah video bukti urutan ke-{i+1})"
+
+            hasil_teks = validate_content(path, instruksi_final, nama)
+            clean_text = hasil_teks.replace("```json", "").replace("```", "").strip()
+            hasil_json = json.loads(clean_text)
+
+            try: os.remove(path)
+            except: pass
+
+            if hasil_json.get('status') == 'INVALID':
+                return jsonify({
+                    "status": "INVALID",
+                    "alasan": f"Video #{i+1} GAGAL: {hasil_json.get('alasan')}"
+                })
+
+        except Exception as e:
+            print(f"Error: {e}")
+            try: os.remove(path)
+            except: pass
+            return jsonify({"status": "INVALID", "alasan": "Kesalahan sistem AI."})
+
+    return jsonify({
+        "status": "VALID",
+        "video_hash": ",".join(hashes)
+    })
 
 if __name__ == '__main__':
     try: subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
