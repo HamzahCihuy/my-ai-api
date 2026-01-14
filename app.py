@@ -11,15 +11,6 @@ import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-try:
-    subprocess.check_call([
-        sys.executable, "-m", "pip", "install", 
-        "--no-cache-dir", "--force-reinstall", 
-        "https://github.com/yt-dlp/yt-dlp/archive/master.zip"
-    ])
-except Exception as e:
-    print(f"Error update yt-dlp: {e}")
-
 app = Flask(__name__)
 CORS(app)
 
@@ -57,7 +48,7 @@ def download_video(url):
         'outtmpl': 'temp_video_%(id)s.mp4',
         'quiet': True, 'no_warnings': True, 'overwrites': True,
         'nocheckcertificate': True, 'geo_bypass': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -114,7 +105,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
 
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Server AI Ready (TikTok Fix + CMS + Multi-Link)!", 200
+    return "Server AI Ready (TikTok Fix via Requirements.txt)!", 200
 
 @app.route('/cek-video', methods=['POST'])
 def api_handler():
