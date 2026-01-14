@@ -1,9 +1,7 @@
-flask
-flask-cors
-yt-dlp
-google-generativeai
+Flask
+Flask-Cors
+opencv-python-headless
 imagehash
 Pillow
-opencv-python-headless
-yt-dlp@git+https://github.com/yt-dlp/yt-dlp.git@master
-
+google-generativeai
+yt-dlp @ git+https://github.com/yt-dlp/yt-dlp.git@master
