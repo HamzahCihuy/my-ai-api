@@ -11,16 +11,25 @@ import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
+try:
+    subprocess.check_call([
+        sys.executable, "-m", "pip", "install", 
+        "--no-cache-dir", "--force-reinstall", 
+        "https://github.com/yt-dlp/yt-dlp/archive/master.zip"
+    ])
+except Exception as e:
+    print(f"Error update yt-dlp: {e}")
+
 app = Flask(__name__)
 CORS(app)
 
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
-    print("❌ PERINGATAN: API Key belum disetting!")
+    print("API Key belum disetting!")
     genai.configure(api_key="")
 else:
-    print("✅ API Key berhasil dimuat.")
+    print("API Key berhasil dimuat.")
     genai.configure(api_key=GOOGLE_API_KEY)
 
 def get_video_fingerprint(video_path):
@@ -42,7 +51,7 @@ def get_video_fingerprint(video_path):
         return None
 
 def download_video(url):
-    print(f"📥 Sedang mengunduh: {url}")
+    print(f"Sedang mengunduh: {url}")
     ydl_opts = {
         'format': 'best[height<=480]/best[height<=720]/best',
         'outtmpl': 'temp_video_%(id)s.mp4',
@@ -61,7 +70,7 @@ def download_video(url):
 def validate_content(file_path, instruksi_input, nama_peserta):
     model = genai.GenerativeModel("gemini-2.5-flash")
 
-    print("🤖 Mengunggah ke AI...")
+    print("Mengunggah ke AI...")
     video_file = genai.upload_file(path=file_path)
 
     while video_file.state.name == "PROCESSING":
@@ -72,7 +81,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
 
     if isinstance(instruksi_input, str) and len(instruksi_input) > 3:
         prompt_spesifik = instruksi_input
-        print(f"✅ Menggunakan Prompt CMS: {prompt_spesifik}")
+        print(f"Menggunakan Prompt CMS: {prompt_spesifik}")
 
     else:
         try: misi_id = int(instruksi_input)
@@ -126,7 +135,7 @@ def api_handler():
     nama = data.get('nama', 'Peserta')
     hashes = []
 
-    print(f"🔄 Memproses {len(urls)} video untuk {nama}...")
+    print(f"Memproses {len(urls)} video untuk {nama}...")
 
     for i, link in enumerate(urls):
         if not link: continue
@@ -168,16 +177,5 @@ def api_handler():
     })
 
 if __name__ == '__main__':
-    try:
-        print("🔄 Mengupdate yt-dlp ke versi Nightly/Master...")
-        subprocess.check_call([
-            sys.executable, "-m", "pip", "install", 
-            "--no-cache-dir", "--force-reinstall", 
-            "https://github.com/yt-dlp/yt-dlp/archive/master.zip"
-        ])
-        print("✅ yt-dlp berhasil diupdate!")
-    except Exception as e:
-        print(f"⚠️ Gagal update yt-dlp: {e}")
-
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
