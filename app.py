@@ -48,7 +48,7 @@ def download_video(url):
         'outtmpl': 'temp_video_%(id)s.mp4',
         'quiet': True, 'no_warnings': True, 'overwrites': True,
         'nocheckcertificate': True, 'geo_bypass': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -59,7 +59,6 @@ def download_video(url):
         return None
 
 def validate_content(file_path, instruksi_input, nama_peserta):
-    # KEMBALI KE GEMINI 2.5 FLASH SESUAI PERMINTAAN
     model = genai.GenerativeModel("gemini-2.5-flash")
 
     print("🤖 Mengunggah ke AI...")
@@ -98,6 +97,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
     Jawab HANYA JSON:
     {{ "status": "VALID" atau "INVALID", "alasan": "Alasan singkat..." }}
     '''
+
     response = model.generate_content([video_file, final_prompt])
     try: genai.delete_file(video_file.name)
     except: pass
@@ -105,7 +105,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
 
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Server AI Ready (CMS + Multi-Link Mode)!", 200
+    return "Server AI Ready (TikTok Fix + CMS + Multi-Link)!", 200
 
 @app.route('/cek-video', methods=['POST'])
 def api_handler():
@@ -133,7 +133,7 @@ def api_handler():
 
         path = download_video(link)
         if not path:
-             return jsonify({"status": "INVALID", "alasan": f"Gagal download video ke-{i+1}."})
+             return jsonify({"status": "INVALID", "alasan": f"Gagal download video ke-{i+1}. Pastikan link publik & server yt-dlp terupdate."})
 
         fp = get_video_fingerprint(path)
         if fp: hashes.append(fp)
@@ -168,7 +168,16 @@ def api_handler():
     })
 
 if __name__ == '__main__':
-    try: subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
-    except: pass
+    try:
+        print("🔄 Mengupdate yt-dlp ke versi Nightly/Master...")
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install", 
+            "--no-cache-dir", "--force-reinstall", 
+            "https://github.com/yt-dlp/yt-dlp/archive/master.zip"
+        ])
+        print("✅ yt-dlp berhasil diupdate!")
+    except Exception as e:
+        print(f"⚠️ Gagal update yt-dlp: {e}")
+
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
