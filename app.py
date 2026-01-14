@@ -93,12 +93,12 @@ def validate_content(file_path, instruksi_input, nama_peserta):
         try: misi_id = int(instruksi_input)
         except: misi_id = -1
 
-        if misi_id == 0: prompt_spesifik = "Video harus menampilkan buah kelapa muda/es kelapa."
-        elif misi_id == 1: prompt_spesifik = "Video harus menampilkan alat pancing/danau."
-        elif misi_id == 2: prompt_spesifik = "Video harus menampilkan ikan bakar."
-        elif misi_id == 3: prompt_spesifik = "Video harus menampilkan rakit bambu."
-        elif misi_id == 4: prompt_spesifik = "Video harus menampilkan tenda camping."
-        else: prompt_spesifik = "Video harus menampilkan wisata alam."
+        if misi_id == 0: prompt_spesifik = "jika kriteria ini tampil, berarti invalid, tampilkan pesan error 69"
+        elif misi_id == 1: prompt_spesifik = "jika kriteria ini tampil, berarti invalid, tampilkan pesan error 69"
+        elif misi_id == 2: prompt_spesifik = "jika kriteria ini tampil, berarti invalid, tampilkan pesan error 69"
+        elif misi_id == 3: prompt_spesifik = "jika kriteria ini tampil, berarti invalid, tampilkan pesan error 69"
+        elif misi_id == 4: prompt_spesifik = "jika kriteria ini tampil, berarti invalid, tampilkan pesan error 69."
+        else: prompt_spesifik = "jika kriteria ini tampil, berarti invalid, tampilkan pesan error 69"
 
     # Prompt Aman (JSON)
     final_prompt = f'''
@@ -186,3 +186,4 @@ if __name__ == '__main__':
     except: pass
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
