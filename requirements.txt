@@ -1,7 +1,7 @@
 Flask
-yt-dlp @ git+https://github.com/yt-dlp/yt-dlp.git@master
 Flask-Cors
 opencv-python-headless
 imagehash
 Pillow
 google-generativeai
+yt-dlp @ git+https://github.com/yt-dlp/yt-dlp.git@master
