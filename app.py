@@ -23,18 +23,6 @@ else:
     print("✅ API Key berhasil dimuat.")
     genai.configure(api_key=GOOGLE_API_KEY)
 
-# --- FUNGSI BARU: UPDATE YT-DLP ---
-def update_ytdlp_otomatis():
-    print("🔄 SYSTEM: Mengecek pembaruan yt-dlp...")
-    try:
-        # Menjalankan perintah pip install -U yt-dlp secara internal
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
-        print("✅ SYSTEM: yt-dlp berhasil diperbarui ke versi paling baru.")
-    except Exception as e:
-        print(f"⚠️ SYSTEM: Gagal update yt-dlp (Mungkin sudah terbaru atau error jaringan). Error: {e}")
-
-# ----------------------------------
-
 def get_video_fingerprint(video_path):
     try:
         cap = cv2.VideoCapture(video_path)
@@ -53,21 +41,30 @@ def get_video_fingerprint(video_path):
         print(f"Gagal fingerprint: {e}")
         return None
 
+# --- BAGIAN INI SUDAH DISAMAKAN PERSIS DENGAN KODE KAMU ---
 def download_video(url):
     print(f"📥 Sedang mengunduh: {url}")
     
     ydl_opts = {
+        # Format sesuai kodemu
         'format': 'best[height<=480]/best[height<=720]/best',
+        
+        # Nama file dibuat dinamis (pakai ID) agar support 3 video sekaligus
         'outtmpl': 'temp_video_%(id)s.mp4', 
+        
+        # Settingan persis kodemu
         'quiet': True,
         'no_warnings': True,
         'overwrites': True,
         'nocheckcertificate': True,
         'geo_bypass': True,
+        
+        # User Agent SAKTI dari kodemu (Chrome 91)
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     }
     
     try:
+        # Kita gunakan metode extract_info agar bisa dapat nama file yang unik untuk setiap link
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             return ydl.prepare_filename(info)
@@ -76,6 +73,7 @@ def download_video(url):
         return None
 
 def validate_content(file_path, instruksi_input, nama_peserta):
+    # Menggunakan Gemini 2.5 Flash sesuai perintah
     model = genai.GenerativeModel("gemini-2.5-flash")
 
     print("🤖 Mengunggah ke AI...")
@@ -87,6 +85,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
 
     prompt_spesifik = ""
 
+    # Logika CMS Prompt
     if isinstance(instruksi_input, str) and len(instruksi_input) > 3:
         prompt_spesifik = instruksi_input
         print(f"✅ Menggunakan Prompt CMS: {prompt_spesifik}")
@@ -101,6 +100,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
         elif misi_id == 4: prompt_spesifik = "jika kriteria ini tampil, berarti invalid, tampilkan pesan error 69."
         else: prompt_spesifik = "jika kriteria ini tampil, berarti invalid, tampilkan pesan error 69"
 
+    # Prompt Aman (JSON)
     final_prompt = f'''
     Kamu adalah Validator Lomba Wisata 'Bukit Jar'un'.
     Nama Peserta: {nama_peserta}
@@ -121,7 +121,7 @@ def validate_content(file_path, instruksi_input, nama_peserta):
 
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Server AI Ready (Auto Update Active)!", 200
+    return "Server AI Ready (Config by User)!", 200
 
 @app.route('/cek-video', methods=['POST'])
 def api_handler():
@@ -182,9 +182,7 @@ def api_handler():
     })
 
 if __name__ == '__main__':
-    # --- PANGGIL FUNGSI UPDATE DISINI ---
-    update_ytdlp_otomatis()
-    # ------------------------------------
-    
+    try: subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
+    except: pass
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
