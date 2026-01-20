@@ -1,10 +1,7 @@
 Flask
 Flask-Cors
-opencv-python-headless
+opencv-python-headless --force-reinstall
 imagehash
 Pillow
 google-generativeai
 yt-dlp @ git+https://github.com/yt-dlp/yt-dlp.git@master
-
-
-
