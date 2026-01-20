@@ -1,6 +1,6 @@
 Flask
 Flask-Cors
-opencv-python-headless --force-reinstall
+opencv-python-headless==4.8.0.74
 imagehash
 Pillow
 google-generativeai
