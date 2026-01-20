@@ -1,6 +1,6 @@
 Flask
 Flask-Cors
-opencv-python-headless==4.8.0.74
+opencv-python-headless==4.12.0.88
 imagehash
 Pillow
 google-generativeai
